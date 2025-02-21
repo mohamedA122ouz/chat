@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #b2d9ea;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            background: white;
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                height: calc(100vh - 5px);
+                /* Reducing height slightly for mobile */
+            }
+        }
+
+        .chat-header {
+            background-color: white;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+        }
+
+        .chat-header img {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+        }
+
+        .chat-body {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+
+        .message.received {
+            background: #f1f1f1;
+            align-self: flex-start;
+        }
+
+        .message.sent {
+            background: #4da8f0;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .chat-footer {
+            padding: 10px;
+            background: white;
+            display: flex;
+            align-items: center;
+            border-top: 1px solid #ddd;
+            position: relative;
+            bottom: 0px;
+        }
+
+        .chat-footer input {
+            flex-grow: 1;
+            border: none;
+            padding: 8px;
+            border-radius: 20px;
+            outline: none;
+            background: #f1f1f1;
+        }
+
+        .chat-footer button {
+            background: #4da8f0;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        #connectionStatus {
+            display: none;
+            color: white;
+            background-color: rgba(155, 0, 0, 0.613);
+            text-align: center;
+            font-size: 14px;
+            padding: 5px;
+        }
+
+        #notification {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(15, 136, 15, 0.673);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            position: absolute;
+            z-index: 6;
+            cursor: pointer;
+        }
+
+        .loading {
+            font-weight: bold;
+            display: inline-block;
+            font-family: monospace;
+            clip-path: inset(0 3ch 0 0);
+            animation: l 1s steps(4, jump-none) infinite;
+        }
+
+        @keyframes l {
+            to {
+                clip-path: inset(0)
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+
+<body>
+    <div id="notification"></div>
+    <audio src="./water_drop.mp3"></audio>
+    <div class="chat-container">
+        <div class="chat-header">
+            <strong id="currentUsername">informant No Chat yet</strong>
+            <img src="https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png"
+                alt="Profile" id="profilePic">
+        </div>
+        <div id="connectionStatus">⚠️ Connection lost, reconnecting...</div>
+        <div class="chat-body" id="messagesList">
+
+        </div>
+        <div class="chat-footer">
+            <input type="text" id="messageInput" placeholder="Send message...">
+            <button id="sendButton"><i class="fa fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.js"></script>
+    <script>
+        let token = "";
+        let userId;
+        const notSeen = [];
+        const notification = document.querySelector("audio");
+        const divLoad = document.createElement("div");
+        divLoad.innerText = "✍🏻IsTyping...";
+        divLoad.className = "message received loading";
+        let timer = 0;
+        let timer2 = 0;
+        const globalMessageUser = { username: "informant No Chat yet", imageLink: "https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png", id: "-1" };
+        try {
+            token = sessionStorage.getItem("token");
+            if (token)
+                Chat();
+            else
+                throw "Not found token";
+        } catch {
+            let times = 0;
+            (function login() {
+                const username = prompt("Enter Your Username");
+                const password = prompt("Enter Your Password");
+                fetch("https://infinitely-native-lamprey.ngrok-free.app/user/login", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        Password: password
+                    })
+                })
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.token) {  // Ensure a token was received
+                            token = res.token;
+                            sessionStorage.setItem("token", token);
+                            Chat(); // Call Chat() after successful login
+                        } else {
+                            throw new Error("Invalid credentials");
+                        }
+                    })
+                    .catch(err => {
+                        if (times < 3) {  // Changed `<=` to `<` to allow exactly 3 attempts
+                            alert("You may have entered the username or password incorrectly. Try again.");
+                            times++;
+                            login();
+                        } else {
+                            alert("Too many failed attempts. Please try later.");
+                        }
+                    });
+            })();
+        }
+        function Chat() {
+            document.querySelector(".chat-header").addEventListener("click", (e) => {
+                GetOnlinePeople();
+            });
+            const url = `https://infinitely-native-lamprey.ngrok-free.app/chat?Authentication=${encodeURIComponent(token)}`;
+            const messageInput = document.getElementById("messageInput");
+            messageInput.focus();
+            const messagesList = document.getElementById("messagesList");
+            const sendButton = document.getElementById("sendButton");
+            messageInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    if (event.shiftKey) {
+                        event.target.innerText += "\n";
+                        return;
+                    }
+                    event.preventDefault(); // Prevent default Enter behavior (new line)
+                    sendMessage(); // Send the message
+                }
+            });
+
+            sendButton.addEventListener("click", sendMessage);
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl(url)
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            async function start() {
+                try {
+                    await connection.start();
+                    console.log("SignalR Connected.");
+                    document.getElementById("connectionStatus").style.display = "none";
+                    GetOnlinePeople();
+                    connection.invoke("MyID");
+                    connection.on("MyID", (MyID) => {
+                        userId = MyID;
+                    });
+                } catch (err) {
+                    console.log(err);
+                    document.getElementById("connectionStatus").style.display = "block";
+                    setTimeout(() => start(), 5000);
+                }
+            }
+
+            connection.onclose(async () => {
+                document.getElementById("connectionStatus").style.display = "block";
+                await start();
+            });
+
+            connection.on("ReceiveError", function (errorMessage) {
+                alert("Error: " + errorMessage);
+            });
+            start();
+            async function sendMessage() {
+                const message = document.getElementById("messageInput").value.trim();
+                const receiverId = globalMessageUser.id;
+                if (!message) {
+                    alert("Please enter a message.");
+                    return;
+                }
+
+                try {
+                    await connection.invoke("SendPrivateMessage", receiverId, message);
+                    appendMessage({ message: message, time: getFormattedTime() })
+                } catch (err) {
+                    console.error("Error sending private message:", err);
+                }
+            }
+            document.getElementById("sendButton").addEventListener("click", sendMessage);
+
+            connection.on("ReceivePrivateMessage", (senderId, message, senderName) => {
+                if (senderId === globalMessageUser.id) {
+                    appendMessage(message, "Reciever");
+                    try { messagesList.removeChild(divLoad); } catch { };
+                    notification.play();
+                    connection.invoke("Confirmation", globalMessageUser.id);
+                    scrollToBottom();
+                }
+                else {
+                    notification.src = "./unlock1.mp3";
+                    notification.play();
+                    notSeen.push(message);
+                    const notificationEl = showNotification(`🔔Message:${message.message}\n➡️${senderName}`);
+                    notificationEl.onclick = () => {
+                        GetOnlinePeople(senderId);
+                        notificationEl.style.display = "none";
+                    }
+                    notification.onended = (el => {
+                        notification.src = "./water_drop.mp3";
+                    });
+                }
+            });
+
+            connection.on("GetOnlinePeople", (online, chosen) => {
+                const UsersName = [];
+                for (const i of online) {
+                    UsersName.push(i.username);
+                }
+                if (chosen === "-1") {
+                    const place = prompt(JSON.stringify(UsersName));
+                    const choosed = online[place];
+                    changeUser(choosed);
+                }else{
+                    const place = online.find(el=>chosen === el.id);
+                    changeUser(place);
+                }
+            });
+
+            connection.on("IsTyping", (senderId) => {
+                if (senderId === globalMessageUser.id) {
+                    messagesList.appendChild(divLoad);
+                    scrollToBottom();
+                    clearTimeout(timer);
+                    timer = setTimeout(() => {
+                        try {
+                            messagesList.removeChild(divLoad);
+                        } catch { };
+                    }, 3000);
+                }
+            });
+            async function GetOnlinePeople(chosen = "-1") {
+                try {
+                    await connection.invoke("GetOnlinePeople", chosen);
+                } catch (err) {
+                    console.error("Error sending private message:", err);
+                }
+            }
+            async function IsTyping() {
+                try {
+                    await connection.invoke("IsTyping", globalMessageUser.id);
+                } catch (err) {
+                    console.error("Error sending private message:", err);
+                }
+            }
+            messageInput.addEventListener("input", (e) => {
+                const value = e.target.value;
+                if (value.length % 10 === 1)
+                    IsTyping();
+            });
+            connection.on("Confirmation", (senderId) => {
+                if (senderId === globalMessageUser.id) {
+                    notification.src = "./received.mp3";
+                    notification.play();
+                    notification.onended = (el => {
+                        notification.src = "./water_drop.mp3";
+                    });
+                }
+            });
+        }
+    </script>
+    <!--helper functions-->
+    <script>
+        function getFormattedTime() {
+            return new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
+        /**
+        * @param {string} message
+        * @param {{id:string,imageLink:string,username:string}} metaData
+        */
+        function showNotification(message, metaData) {
+            const notification = document.getElementById("notification");
+            notification.innerText = message;
+            notification.style.display = "block";
+            notification.dataset = metaData;
+            setTimeout(() => {
+                notification.style.display = "none";
+            }, 5000);
+            return notification;
+        }
+        function scrollToBottom() {
+            const height = document.getElementsByClassName("chat-body")[0].scrollHeight;
+            document.getElementsByClassName("chat-body")[0].scrollTo(0, height);
+        }
+        /**
+        * @param {{id:string,imageLink:string,username:string}} chosen
+        * @param {()=>{}} callback
+        */
+        function changeUser(chosen, callback) {
+            globalMessageUser.id = chosen.id;
+            globalMessageUser.imageLink = chosen.imageLink;
+            globalMessageUser.username = chosen.username;
+            document.getElementById("profilePic").src = globalMessageUser.imageLink;
+            document.getElementById("currentUsername").innerText = globalMessageUser.username;
+            document.querySelector(".chat-body").innerText = "";
+            while(notSeen.length>0){
+                appendMessage(notSeen.shift(),"Reciever");
+            }
+        }
+        /**
+         * @param {{message:string,time:string}} message
+         * @param {"Sender"|"Reciever"} type
+        */
+        function appendMessage(message, type) {
+            const messagesList = document.getElementById("messagesList");
+            const div = document.createElement("div");
+            const innerMessage = document.createElement("div");
+            innerMessage.innerText = message.message;
+            const time = document.createElement("div");
+            time.innerText = `sent at:${message.time}`;
+            time.style.cssText = "font-size:0.5rem;";
+            if (type === "Reciever")
+                div.className = "message received";
+            else
+                div.className = "message sent";
+            div.appendChild(innerMessage);
+            div.appendChild(time);
+            messagesList.appendChild(div);
+            document.getElementById("messageInput").value = "";
+            messagesList.scrollTop = messagesList.scrollHeight;
+            scrollToBottom();
+        }
+
+    </script>
+</body>
+
+</html>
