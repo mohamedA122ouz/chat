@@ -429,12 +429,13 @@
             time.style.cssText = "font-size:0.5rem;";
             if (type === "Reciever")
                 div.className = "message received";
-            else
+            else{
                 div.className = "message sent";
+                document.getElementById("messageInput").value = "";
+            }
             div.appendChild(innerMessage);
             div.appendChild(time);
             messagesList.appendChild(div);
-            document.getElementById("messageInput").value = "";
             messagesList.scrollTop = messagesList.scrollHeight;
             scrollToBottom();
         }
