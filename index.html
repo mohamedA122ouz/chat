@@ -171,6 +171,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.js"></script>
     <script>
         let token = "";
+        const regex = /[ا-ي]/;
         let userId;
         const notSeen = [];
         const notification = document.querySelector("audio");
@@ -359,6 +360,9 @@
             }
             messageInput.addEventListener("input", (e) => {
                 const value = e.target.value;
+                if(regex.test(value)){
+                    e.target.style.direction = "rtl";
+                }
                 if (value.length % 10 === 1)
                     IsTyping();
             });
@@ -423,7 +427,7 @@
             const messagesList = document.getElementById("messagesList");
             const div = document.createElement("div");
             const innerMessage = document.createElement("div");
-            const regex = /[ا-ي]/;
+
             innerMessage.innerText = message.message;
             const time = document.createElement("div");
             time.innerText = `sent at:${message.time}`;
