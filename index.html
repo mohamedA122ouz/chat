@@ -325,8 +325,8 @@
                     const place = prompt(JSON.stringify(UsersName));
                     const choosed = online[place];
                     changeUser(choosed);
-                }else{
-                    const place = online.find(el=>chosen === el.id);
+                } else {
+                    const place = online.find(el => chosen === el.id);
                     changeUser(place);
                 }
             });
@@ -411,8 +411,8 @@
             document.getElementById("profilePic").src = globalMessageUser.imageLink;
             document.getElementById("currentUsername").innerText = globalMessageUser.username;
             document.querySelector(".chat-body").innerText = "";
-            while(notSeen.length>0){
-                appendMessage(notSeen.shift(),"Reciever");
+            while (notSeen.length > 0) {
+                appendMessage(notSeen.shift(), "Reciever");
             }
         }
         /**
@@ -423,13 +423,17 @@
             const messagesList = document.getElementById("messagesList");
             const div = document.createElement("div");
             const innerMessage = document.createElement("div");
+            const regex = /[ا-ي]/;
             innerMessage.innerText = message.message;
             const time = document.createElement("div");
             time.innerText = `sent at:${message.time}`;
             time.style.cssText = "font-size:0.5rem;";
+            if (regex.test(message.message)) {
+                innerMessage.style.direction = "rtl";
+            }
             if (type === "Reciever")
                 div.className = "message received";
-            else{
+            else {
                 div.className = "message sent";
                 document.getElementById("messageInput").value = "";
             }
