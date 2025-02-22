@@ -171,7 +171,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.js"></script>
     <script>
         let token = "";
-        const regex = /[ا-ي]/;
+        const regex = /^[ا-ي]/;
         let userId;
         const notSeen = [];
         const notification = document.querySelector("audio");
@@ -362,6 +362,8 @@
                 const value = e.target.value;
                 if(regex.test(value)){
                     e.target.style.direction = "rtl";
+                }else{
+                    e.target.style.direction = "ltr";
                 }
                 if (value.length % 10 === 1)
                     IsTyping();
