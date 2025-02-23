@@ -475,27 +475,44 @@
                     mediaRecorder.onstop = async () => {
                         const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
                         const audioUrl = URL.createObjectURL(audioBlob);
-                        displayAudioMessage(audioUrl, globalMessageUser.id); // Display sent message
-                        await sendAudioInChunks(audioBlob);
+                        let div = displayAudioMessage(audioUrl, globalMessageUser.id); // Display sent message
+                        await sendAudioInChunks(audioBlob, div);
                     };
                 }
             }
 
-            async function sendAudioInChunks(audioBlob) {
+            async function sendAudioInChunks(audioBlob, div) {
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 reader.onloadend = async () => {
-                    const base64Audio = reader.result.split(',')[1]; // Remove `data:audio/webm;base64,` prefix
+                    const base64Audio = reader.result.split(',')[1]; // Remove prefix
                     const chunkSize = 5000; // Adjust chunk size if needed
                     const totalChunks = Math.ceil(base64Audio.length / chunkSize);
+
+                    let uploadedChunks = 0; // Track progress
 
                     for (let i = 0; i < totalChunks; i++) {
                         const chunk = base64Audio.slice(i * chunkSize, (i + 1) * chunkSize);
                         const isLastChunk = i === totalChunks - 1;
 
                         await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk);
+
+                        uploadedChunks++;
+                        updateUploadProgress(uploadedChunks, totalChunks, div); // Update UI
                     }
                 };
+            }
+
+            // Function to update progress in UI
+            function updateUploadProgress(uploadedChunks, totalChunks, div) {
+                const percentage = Math.round((uploadedChunks / totalChunks) * 100);
+                // const progressText = document.getElementById("uploadProgress");
+                if (div) {
+                    if (percentage == 100)
+                        div.innerText = getFormattedTime();
+                    else
+                        div.innerText = `${percentage}%`;
+                }
             }
 
 
@@ -597,7 +614,7 @@
             innerMessage.innerText = message.message;
             const time = document.createElement("div");
             time.innerText = `sent at:${message.time}`;
-            time.style.cssText = "font-size:0.5rem;";
+            time.style.cssText = "font-size:0.54rem;";
             if (regex.test(message.message)) {
                 innerMessage.style.direction = "rtl";
             }
@@ -621,7 +638,7 @@
             innerMessage.innerText = message.message;
             const time = document.createElement("div");
             time.innerText = `sent at:${message.time}`;
-            time.style.cssText = "font-size:0.5rem;";
+            time.style.cssText = "font-size:0.54rem;";
             if (regex.test(message.message)) {
                 innerMessage.style.direction = "rtl";
             }
@@ -643,6 +660,8 @@
         */
         function displayAudioMessage(audioUrl, senderId, type = "Sender") {
             const messagesList = document.getElementById("messagesList");
+            const process = document.createElement("div");
+            process.style.cssText = "font-size:0.8rem;";
             const div = document.createElement("div");
             const audioElement = document.createElement("audio");
             audioElement.controls = true;
@@ -653,10 +672,12 @@
             else
                 div.className = "message sent";
             div.appendChild(audioElement);
+            div.appendChild(process);
             messagesList.appendChild(div);
 
             // Scroll to the latest message
             scrollToBottom();
+            return process;
         }
 
     </script>
