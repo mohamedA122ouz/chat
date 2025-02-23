@@ -119,6 +119,11 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .chat-footer button:hover {
+            background: #3a91d7;
         }
 
         #connectionStatus {
@@ -176,6 +181,10 @@
         </div>
         <div class="chat-footer">
             <div contenteditable="true" type="text" id="messageInput"></div>
+
+            <!-- Record Button -->
+            <button id="recordButton"><i class="fa fa-microphone"></i></button>
+
             <button id="sendButton"><i class="fa fa-arrow-right"></i></button>
         </div>
     </div>
@@ -239,6 +248,7 @@
             })();
         }
         function Chat() {
+            document.getElementById("recordButton").addEventListener("click", toggleRecording);
             document.querySelector(".chat-header").addEventListener("click", (e) => {
                 GetOnlinePeople();
             });
@@ -324,15 +334,18 @@
                     }
                 }, 1000);
             }
-            function allSent(){
+            function allSent() {
                 return interval = -0x12 && notSent.length > 0;
+            }
+            function confirm() {
+                connection.invoke("Confirmation", globalMessageUser.id);
             }
             connection.on("ReceivePrivateMessage", (senderId, message, senderName) => {
                 if (senderId === globalMessageUser.id) {
                     appendMessage(message, "Reciever");
                     try { messagesList.removeChild(divLoad); } catch { };
                     notification.play();
-                    connection.invoke("Confirmation", globalMessageUser.id);
+                    confirm();
                     scrollToBottom();
                 }
                 else {
@@ -413,6 +426,110 @@
                     });
                 }
             });
+            // ________________________________________________________________
+            document.addEventListener("keydown", async (event) => {
+                if (event.ctrlKey && event.key.toLowerCase() === 'i') {
+                    event.preventDefault();
+                    toggleRecording();
+                }
+            });
+
+            let mediaRecorder;
+            let audioChunks = [];
+            let isRecording = false;
+
+            async function toggleRecording() {
+                if (!isRecording) {
+                    startRecording();
+                } else {
+                    stopRecording();
+                }
+            }
+
+            async function startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    isRecording = true;
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.start();
+                    console.log("Recording started... Press Ctrl + I to stop.");
+                } catch (error) {
+                    console.error("Error accessing microphone:", error);
+                }
+            }
+
+            async function stopRecording() {
+                if (mediaRecorder && isRecording) {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    console.log("Recording stopped... Sending audio.");
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        displayAudioMessage(audioUrl, globalMessageUser.id); // Display sent message
+                        await sendAudioInChunks(audioBlob);
+                    };
+                }
+            }
+
+            async function sendAudioInChunks(audioBlob) {
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = reader.result.split(',')[1]; // Remove `data:audio/webm;base64,` prefix
+                    const chunkSize = 5000; // Adjust chunk size if needed
+                    const totalChunks = Math.ceil(base64Audio.length / chunkSize);
+
+                    for (let i = 0; i < totalChunks; i++) {
+                        const chunk = base64Audio.slice(i * chunkSize, (i + 1) * chunkSize);
+                        const isLastChunk = i === totalChunks - 1;
+
+                        await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk);
+                    }
+                };
+            }
+
+
+
+            let audioMessageBuffer = {}; // Store incoming chunks per sender
+
+            connection.on("sendlargemessage", async (senderUserId, messageSize, chunkIndex, chunk, finished, time) => {
+                // Ensure buffer exists for this sender
+                if (!audioMessageBuffer[senderUserId]) {
+                    audioMessageBuffer[senderUserId] = { chunks: [], receivedSize: 0 };
+                }
+
+                // Store chunk at correct index
+                audioMessageBuffer[senderUserId].chunks[chunkIndex] = chunk;
+                audioMessageBuffer[senderUserId].receivedSize += chunk.length;
+
+                console.log(`Received chunk ${chunkIndex} from ${senderUserId}, Size: ${chunk.length}`);
+
+                // Process when all chunks are received
+                if (finished && audioMessageBuffer[senderUserId].receivedSize >= messageSize) {
+                    console.log(`All chunks received from ${senderUserId}. Reconstructing audio...`);
+
+                    let base64Audio = audioMessageBuffer[senderUserId].chunks.join(""); // Combine chunks
+
+                    let audioBlob = new Blob([Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))], { type: "audio/webm" });
+                    let audioUrl = URL.createObjectURL(audioBlob);
+
+                    displayAudioMessage(audioUrl, senderUserId, "Reciever");
+                    confirm();
+                    notification.play();
+                    // Cleanup buffer to free memory
+                    delete audioMessageBuffer[senderUserId];
+                }
+            });
         }
     </script>
     <!--helper functions-->
@@ -485,7 +602,62 @@
             messagesList.scrollTop = messagesList.scrollHeight;
             scrollToBottom();
         }
+        function appendMessage(message, type = "Sender") {
+            const messagesList = document.getElementById("messagesList");
+            const div = document.createElement("div");
+            const innerMessage = document.createElement("div");
 
+            innerMessage.innerText = message.message;
+            const time = document.createElement("div");
+            time.innerText = `sent at:${message.time}`;
+            time.style.cssText = "font-size:0.5rem;";
+            if (regex.test(message.message)) {
+                innerMessage.style.direction = "rtl";
+            }
+            if (type === "Reciever")
+                div.className = "message received";
+            else {
+                div.className = "message sent";
+                document.getElementById("messageInput").innerText = "";
+            }
+            div.appendChild(innerMessage);
+            div.appendChild(time);
+            messagesList.appendChild(div);
+            messagesList.scrollTop = messagesList.scrollHeight;
+            scrollToBottom();
+        }
+        /**
+        * @param {{message:string,time:string}} message
+        * @param {"Sender"|"Reciever"} type
+        */
+        function displayAudioMessage(audioUrl, senderId, type = "Sender") {
+            const messagesList = document.getElementById("messagesList");
+            const div = document.createElement("div");
+            const audioElement = document.createElement("audio");
+            audioElement.controls = true;
+            audioElement.src = audioUrl;
+            audioElement.style.scale = "0.9";
+            if (type === "Reciever")
+                div.className = "message received";
+            else
+                div.className = "message sent";
+            div.appendChild(audioElement);
+            messagesList.appendChild(div);
+
+            // Scroll to the latest message
+            scrollToBottom();
+        }
+        async function toggleRecording() {
+            let recordButton = document.getElementById("recordButton");
+
+            if (!isRecording) {
+                recordButton.style.background = "red"; // Indicate recording
+                startRecording();
+            } else {
+                recordButton.style.background = "#4da8f0"; // Reset color
+                stopRecording();
+            }
+        }
     </script>
 </body>
 
