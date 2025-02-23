@@ -530,6 +530,17 @@
                     delete audioMessageBuffer[senderUserId];
                 }
             });
+            async function toggleRecording() {
+                let recordButton = document.getElementById("recordButton");
+
+                if (!isRecording) {
+                    recordButton.style.background = "red"; // Indicate recording
+                    startRecording();
+                } else {
+                    recordButton.style.background = "#4da8f0"; // Reset color
+                    stopRecording();
+                }
+            }
         }
     </script>
     <!--helper functions-->
@@ -647,17 +658,7 @@
             // Scroll to the latest message
             scrollToBottom();
         }
-        async function toggleRecording() {
-            let recordButton = document.getElementById("recordButton");
 
-            if (!isRecording) {
-                recordButton.style.background = "red"; // Indicate recording
-                startRecording();
-            } else {
-                recordButton.style.background = "#4da8f0"; // Reset color
-                stopRecording();
-            }
-        }
     </script>
 </body>
 
