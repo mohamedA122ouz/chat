@@ -296,6 +296,7 @@
                 ref.innerHTML = 'X';
 
                 if (e.target.classList.contains("message")) {
+                    refID_El.style.padding = "10px";
                     RefID = e.target.id;
                     refID_El.onclick = () => {
                         elementFocus(e.target)
@@ -315,6 +316,7 @@
                     ref.onclick = removeRef;
                     refID_El.appendChild(ref);
                 }
+                messageInput.focus();
             }
             function handleTouch(e) {
                 isTouchDevice = true;
@@ -645,9 +647,10 @@
                         confirm();
                     }
                     else {
+                        //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
                         notification.src = "./unlock1.mp3";
                         notification.play();
-                        notSeen.push([audioUrl, time]);
+                        notSeen.push([audioUrl,messageRefId,messageID, time]);
                         const notificationEl = showNotification(`🎙️Record from ➡️ ${senderName}`);
                         notificationEl.onclick = () => {
                             GetOnlinePeople(senderUserId);
@@ -714,8 +717,11 @@
             document.querySelector(".chat-body").innerText = "";
             while (notSeen.length > 0) {
                 const notSeenEl = notSeen.shift();
-                if (notSeenEl instanceof Array)
-                    displayAudioMessage(notSeenEl[0], globalMessageUser.id, notSeenEl[1], "Reciever");
+                if (notSeenEl instanceof Array){
+                    //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
+                    // notseen audio arr => [audioUrl,messageRefId,messageID, time] 
+                    displayAudioMessage(notSeenEl[0], globalMessageUser.id, notSeenEl[3],notSeenEl[1],notSeenEl[2], "Reciever");
+                }
                 else
                     appendMessage(notSeenEl, "Reciever");
             }
@@ -811,7 +817,7 @@
             RefID = "";
         }
         function targetText(el) {
-            refID_El.style.padding = "10px";
+
             let childNodes = el.childNodes;
             let mainChildNode = el.querySelector(".textM");
             let text = "";
@@ -820,11 +826,11 @@
             } else if (el.classList.contains("received")) {
                 text = `(${globalMessageUser.username}) `;
             }
-            if (mainChildNode === undefined) {
+            if (!mainChildNode) {
                 mainChildNode = el.querySelector("audio");
             }
             if (mainChildNode.tagName !== "DIV") {
-                text += `Audio: at ${mainChildNode.innerText}`;
+                text += `Audio: at ${el.lastChild.innerText}`;
             } else {
                 let str = mainChildNode.innerText;
                 text += str.length > 20 ? str.substring(0, 20) + "...." : str;
