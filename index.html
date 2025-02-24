@@ -798,7 +798,7 @@
             if (type === "Reciever") {
                 _time.innerText = `sent at:${time}`;
                 _time.style.cssText = "font-size:0.54rem;";
-                addToDom(id, refId, type, audioElement, _time, process);
+                addToDom(id, refId, type, audioElement, process, _time);
                 return [process, audioElement];
             }
             addToDom(id, refId, type, audioElement, process);
