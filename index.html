@@ -27,7 +27,18 @@
             overflow: hidden;
         }
 
+        .FocuNow {
+            box-shadow: 10px 7px 11px 0 black;
+        }
+
         @media (max-width: 768px) {
+            .message>audio {
+                max-width: 70%;
+                padding: 10px;
+                border-radius: 15px;
+                margin-bottom: 10px;
+            }
+
             .chat-container {
                 height: calc(100vh - 5px);
                 /* Reducing height slightly for mobile */
@@ -56,6 +67,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            scroll-behavior: smooth;
         }
 
         .message {
@@ -63,6 +75,7 @@
             padding: 10px;
             border-radius: 15px;
             margin-bottom: 10px;
+            transition: 350ms;
         }
 
         .message.received {
@@ -180,6 +193,7 @@
 
         </div>
         <div class="chat-footer">
+            <div id="RefID"></div>
             <div contenteditable="true" type="text" id="messageInput"></div>
 
             <!-- Record Button -->
@@ -197,10 +211,17 @@
         const notSeen = [];
         const notification = document.querySelector("audio");
         const divLoad = document.createElement("div");
+        const divRecording = document.createElement("div");
         const notSent = [];
+        let idCounter = 0;
+        let isTouchDevice = false;
         let interval = -0x12;
+        let RefID = "";
+        const refID_El = document.getElementById("RefID");
         divLoad.innerText = "✍🏻IsTyping...";
         divLoad.className = "message received loading";
+        divRecording.innerText = "🎙️IsRecording...";
+        divRecording.className = "message received loading";
         let timer = 0;
         let timer2 = 0;
         const globalMessageUser = { username: "informant No Chat yet", imageLink: "https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png", id: "-1" };
@@ -249,6 +270,31 @@
         }
         function Chat() {
             document.getElementById("recordButton").addEventListener("click", toggleRecording);
+            document.addEventListener("touchstart", handleTouch);
+            document.addEventListener("dblclick", handleDoubleClick);
+            function handleDoubleClick(e) {
+                /**
+                 * @param {HTMLElement} el
+                 */
+
+                if (e.target.classList.contains("message")) {
+                    RefID = e.target.id;
+                    refID_El.innerText = (e.target.innerText);
+                    refID_El.onclick = () => {
+                        elementFocus(e.target)
+                    }
+                } else if (e.target.parentElement.classList.contains("message")) {
+                    RefID = e.target.parentElement.id;
+                    refID_El.innerText = (e.target.parentElement.innerText);
+                    refID_El.onclick = () => {
+                        elementFocus(e.target.parentElement);
+                    }
+                }
+            }
+            function handleTouch(e) {
+                isTouchDevice = true;
+                removeEventListener(handleTouch);
+            }
             document.querySelector(".chat-header").addEventListener("click", (e) => {
                 GetOnlinePeople();
             });
@@ -258,7 +304,7 @@
             const messagesList = document.getElementById("messagesList");
             const sendButton = document.getElementById("sendButton");
             messageInput.addEventListener("keydown", function (event) {
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (event.key === "Enter" && !event.shiftKey && !isTouchDevice) {
                     sendMessage();
                     event.preventDefault();
                     return;
@@ -309,8 +355,9 @@
                 try {
                     if (allSent())
                         sendNotSent();
-                    appendMessage({ message: message, time: getFormattedTime() });
-                    await connection.invoke("SendPrivateMessage", receiverId, message);
+                    const messageId = (getFormattedTime() + message + ++idCounter).replaceAll(/\s/ig, "");
+                    appendMessage({ message: message,ref:RefID, time: getFormattedTime(), messageID: messageId });
+                    await connection.invoke("SendPrivateMessage", receiverId, message, messageId, RefID);
                 } catch (err) {
                     notSent.push({ MDetails: { message: message, time: getFormattedTime() }, receiverId: receiverId });
                     console.error("Error sending private message:", err);
@@ -390,6 +437,32 @@
                     }, 3000);
                 }
             });
+            connection.on("isRecording", (senderId) => {
+                if (senderId === globalMessageUser.id) {
+                    messagesList.appendChild(divRecording);
+                    scrollToBottom();
+                }
+            });
+            connection.on("stopRecording", (senderId) => {
+                if (senderId === globalMessageUser.id) {
+                    messagesList.removeChild(divRecording);
+                    scrollToBottom();
+                }
+            });
+            async function Recording() {
+                try {
+                    await connection.invoke("isRecording", globalMessageUser.id);
+                } catch (err) {
+                    console.error("Error sending private message:", err);
+                }
+            }
+            async function _StopRecording() {
+                try {
+                    await connection.invoke("stopRecording", globalMessageUser.id);
+                } catch (err) {
+                    console.error("Error sending private message:", err);
+                }
+            }
             async function GetOnlinePeople(chosen = "-1") {
                 try {
                     await connection.invoke("GetOnlinePeople", chosen);
@@ -441,8 +514,10 @@
             async function toggleRecording() {
                 if (!isRecording) {
                     startRecording();
+                    Recording();
                 } else {
                     stopRecording();
+                    _StopRecording();
                 }
             }
 
@@ -452,7 +527,7 @@
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
                     isRecording = true;
-
+                    Recording();
                     mediaRecorder.ondataavailable = (event) => {
                         if (event.data.size > 0) {
                             audioChunks.push(event.data);
@@ -470,12 +545,13 @@
                 if (mediaRecorder && isRecording) {
                     mediaRecorder.stop();
                     isRecording = false;
+                    _StopRecording();
                     console.log("Recording stopped... Sending audio.");
 
                     mediaRecorder.onstop = async () => {
                         const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
                         const audioUrl = URL.createObjectURL(audioBlob);
-                        let div = displayAudioMessage(audioUrl, globalMessageUser.id); // Display sent message
+                        [div] = displayAudioMessage(audioUrl, globalMessageUser.id); // Display sent message
                         await sendAudioInChunks(audioBlob, div);
                     };
                 }
@@ -495,7 +571,7 @@
                         const chunk = base64Audio.slice(i * chunkSize, (i + 1) * chunkSize);
                         const isLastChunk = i === totalChunks - 1;
 
-                        await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk);
+                        await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk, RefID);
 
                         uploadedChunks++;
                         updateUploadProgress(uploadedChunks, totalChunks, div); // Update UI
@@ -540,8 +616,9 @@
                     let audioBlob = new Blob([Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))], { type: "audio/webm" });
                     let audioUrl = URL.createObjectURL(audioBlob);
 
-                    displayAudioMessage(audioUrl, senderUserId, "Reciever");
-                    confirm();
+                    const [process, audio] = displayAudioMessage(audioUrl, senderUserId, time, "Reciever");
+                    audio.
+                        confirm();
                     notification.play();
                     // Cleanup buffer to free memory
                     delete audioMessageBuffer[senderUserId];
@@ -602,15 +679,41 @@
                 appendMessage(notSeen.shift(), "Reciever");
             }
         }
+        function addToDom(id, type = "Sender", ...elements) {
+            const messagesList = document.getElementById("messagesList");
+            const div = document.createElement("div");
+            div.id = id;
+            div.tabIndex = 0;
+            if (type === "Reciever")
+                div.className = "message received";
+            else {
+                div.className = "message sent";
+                document.getElementById("messageInput").innerText = "";
+            }
+            scrollToBottom();
+            for (let i of elements) {
+                div.append(i);
+            }
+            messagesList.appendChild(div);
+        }
         /**
-         * @param {{message:string,time:string}} message
+         * @param {{message:string,time:string,messageID:string}} message
          * @param {"Sender"|"Reciever"} type
         */
         function appendMessage(message, type = "Sender") {
-            const messagesList = document.getElementById("messagesList");
-            const div = document.createElement("div");
             const innerMessage = document.createElement("div");
-
+            const ref = document.createElement("div");
+            ref.style.fontSize = "0.56rem";
+            ref.style.backgroundColor = "#008f7e";
+            ref.style.cursor = "pointer";
+            if(message.ref){
+                const referencedEl = document.getElementById(message.ref)
+                ref.innerHTML = referencedEl.childNodes[1].innerText.substring(0,20);
+                ref.onclick = () => {
+                    elementFocus(referencedEl);
+                }
+                ref.className = "REF";
+            }
             innerMessage.innerText = message.message;
             const time = document.createElement("div");
             time.innerText = `sent at:${message.time}`;
@@ -618,68 +721,31 @@
             if (regex.test(message.message)) {
                 innerMessage.style.direction = "rtl";
             }
-            if (type === "Reciever")
-                div.className = "message received";
-            else {
-                div.className = "message sent";
-                document.getElementById("messageInput").innerText = "";
-            }
-            div.appendChild(innerMessage);
-            div.appendChild(time);
-            messagesList.appendChild(div);
-            messagesList.scrollTop = messagesList.scrollHeight;
-            scrollToBottom();
-        }
-        function appendMessage(message, type = "Sender") {
-            const messagesList = document.getElementById("messagesList");
-            const div = document.createElement("div");
-            const innerMessage = document.createElement("div");
-
-            innerMessage.innerText = message.message;
-            const time = document.createElement("div");
-            time.innerText = `sent at:${message.time}`;
-            time.style.cssText = "font-size:0.54rem;";
-            if (regex.test(message.message)) {
-                innerMessage.style.direction = "rtl";
-            }
-            if (type === "Reciever")
-                div.className = "message received";
-            else {
-                div.className = "message sent";
-                document.getElementById("messageInput").innerText = "";
-            }
-            div.appendChild(innerMessage);
-            div.appendChild(time);
-            messagesList.appendChild(div);
-            messagesList.scrollTop = messagesList.scrollHeight;
-            scrollToBottom();
+            addToDom(message.messageID, type, ref, innerMessage, time);
         }
         /**
         * @param {{message:string,time:string}} message
         * @param {"Sender"|"Reciever"} type
         */
-        function displayAudioMessage(audioUrl, senderId, type = "Sender") {
-            const messagesList = document.getElementById("messagesList");
+        function displayAudioMessage(audioUrl, senderId, time, type = "Sender") {
             const process = document.createElement("div");
             process.style.cssText = "font-size:0.8rem;";
-            const div = document.createElement("div");
             const audioElement = document.createElement("audio");
             audioElement.controls = true;
+            audioElement.preload = "metadata";
             audioElement.src = audioUrl;
             audioElement.style.scale = "0.9";
-            if (type === "Reciever")
-                div.className = "message received";
-            else
-                div.className = "message sent";
-            div.appendChild(audioElement);
-            div.appendChild(process);
-            messagesList.appendChild(div);
-
-            // Scroll to the latest message
-            scrollToBottom();
-            return process;
+            const id = "Audio" + getFormattedTime() + ++idCounter;
+            addToDom(id, type, audioElement, process);
+            return [process, audioElement];
         }
-
+        function elementFocus(el) {
+            el.focus();
+            el.style.boxShadow = "10px 7px 11px 0 black";
+            setTimeout(() => {
+                el.removeAttribute("style");
+            }, 1500)
+        }
     </script>
 </body>
 
