@@ -33,7 +33,7 @@
 
         @media (max-width: 768px) {
             .message>audio {
-                max-width: 70%;
+                width:250px;
                 padding: 10px;
                 border-radius: 15px;
                 margin-bottom: 10px;
@@ -184,6 +184,17 @@
             margin-bottom: 0;
         }
 
+        .sent>audio::-webkit-media-controls-panel {
+            background-color: #4da8f0;
+            border: none;
+            outline: none;
+        }
+        .receive>audio::-webkit-media-controls-panel {
+            background-color: #f1f1f1;
+            border: none;
+            outline: none;
+        }
+
         @keyframes l {
             to {
                 clip-path: inset(0)
@@ -221,7 +232,7 @@
         let token = "";
         const regex = /^[ا-ي]/;
         let userId;
-        const notSeen = [];
+        const notSeen = {};
         const notification = document.querySelector("audio");
         const divLoad = document.createElement("div");
         const divRecording = document.createElement("div");
@@ -286,6 +297,7 @@
             document.addEventListener("touchstart", handleTouch);
             document.addEventListener("dblclick", handleDoubleClick);
             function handleDoubleClick(e) {
+                e.preventDefault();
                 /**
                  * @param {HTMLElement} el
                  */
@@ -426,7 +438,9 @@
                 else {
                     notification.src = "./unlock1.mp3";
                     notification.play();
-                    notSeen.push(message);
+                    if (!(notSeen[senderId] instanceof Array))
+                        notSeen[senderId] = [];
+                    notSeen[senderId].push(message);
                     const notificationEl = showNotification(`🔔Message:${message.message}\n➡️${senderName}`);
                     notificationEl.onclick = () => {
                         GetOnlinePeople(senderId);
@@ -650,7 +664,9 @@
                         //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
                         notification.src = "./unlock1.mp3";
                         notification.play();
-                        notSeen.push([audioUrl,messageRefId,messageID, time]);
+                        if ((!notSeen[senderUserId] instanceof Array))
+                            notSeen[senderUserId] = [];
+                        notSeen[senderUserId].push([audioUrl, messageRefId, messageID, time]);
                         const notificationEl = showNotification(`🎙️Record from ➡️ ${senderName}`);
                         notificationEl.onclick = () => {
                             GetOnlinePeople(senderUserId);
@@ -715,15 +731,18 @@
             document.getElementById("profilePic").src = globalMessageUser.imageLink;
             document.getElementById("currentUsername").innerText = globalMessageUser.username;
             document.querySelector(".chat-body").innerText = "";
-            while (notSeen.length > 0) {
-                const notSeenEl = notSeen.shift();
-                if (notSeenEl instanceof Array){
-                    //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
-                    // notseen audio arr => [audioUrl,messageRefId,messageID, time] 
-                    displayAudioMessage(notSeenEl[0], globalMessageUser.id, notSeenEl[3],notSeenEl[1],notSeenEl[2], "Reciever");
+            if (notSeen[globalMessageUser.id]) {
+                let items = notSeen[globalMessageUser.id];
+                while (items.length > 0) {
+                    const notSeenEl = items.shift();
+                    if (notSeenEl instanceof Array) {
+                        //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
+                        // notseen audio arr => [audioUrl,messageRefId,messageID, time] 
+                        displayAudioMessage(notSeenEl[0], globalMessageUser.id, notSeenEl[3], notSeenEl[1], notSeenEl[2], "Reciever");
+                    }
+                    else
+                        appendMessage(notSeenEl, "Reciever");
                 }
-                else
-                    appendMessage(notSeenEl, "Reciever");
             }
         }
         function addToDom(id, refId, type = "Sender", ...elements) {
