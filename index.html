@@ -122,6 +122,7 @@
 
         .chat-footer button {
             background: #4da8f0;
+            color: #f8fffe8e;
             color: white;
             border: none;
             border-radius: 50%;
@@ -171,12 +172,16 @@
         }
 
         #RefID {
-            width: 100vw;
-            background-color: #008f7e;
-            color: white;
-            font-weight: bold;
-            padding: 0px 20px;
+            width: 90vw;
             display: flex;
+            font-size: 0.8rem;
+            margin: auto;
+            border-left: 5px solid #008f7e;
+            background-color: #d5dbda8e;
+            color: black;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 0;
         }
 
         @keyframes l {
@@ -285,32 +290,31 @@
                  * @param {HTMLElement} el
                  */
 
-                const div = document.createElement("div");
-                div.innerHTML = 'X';
-                div.style.cssText = "margin-left:auto;width:20px;height:20px;cursor:pointer;";
+
+                const ref = document.createElement("div");
+                ref.style.cssText = "margin-left:auto;margin-right:10px;";
+                ref.innerHTML = 'X';
 
                 if (e.target.classList.contains("message")) {
                     RefID = e.target.id;
-                    refID_El.innerText = (e.target.childNodes[1].innerText);
                     refID_El.onclick = () => {
                         elementFocus(e.target)
                     }
-                    div.onclick = () => {
-                        refID_El.innerHTML = "";
-                        RefID = "";
-                    }
+                    const text = targetText(e.target);
+                    ref.onclick = removeRef;
+                    refID_El.innerText = text;
+                    refID_El.appendChild(ref);
                 } else if (e.target.parentElement.classList.contains("message")) {
                     RefID = e.target.parentElement.id;
-                    refID_El.innerText = (e.target.parentElement.childNodes[1].innerText);
+                    refID_El.style.padding = "10px";
+                    let text = targetText(e.target.parentElement);
+                    refID_El.innerText = text;
                     refID_El.onclick = () => {
                         elementFocus(e.target.parentElement);
                     }
-                    div.onclick = () => {
-                        refID_El.innerHTML = "";
-                        RefID = "";
-                    }
+                    ref.onclick = removeRef;
+                    refID_El.appendChild(ref);
                 }
-                refID_El.appendChild(div);
             }
             function handleTouch(e) {
                 isTouchDevice = true;
@@ -377,8 +381,9 @@
                     if (allSent())
                         sendNotSent();
                     const messageId = (getFormattedTime() + message + ++idCounter).replaceAll(/\s/ig, "");
-                    appendMessage({ message: message, ref: RefID, time: getFormattedTime(), messageID: messageId });
-                    await connection.invoke("SendPrivateMessage", receiverId, message, messageId, RefID);
+                    const localRefId = RefID;
+                    appendMessage({ message: message, ref: localRefId, time: getFormattedTime(), messageID: messageId });
+                    await connection.invoke("SendPrivateMessage", receiverId, message, messageId, localRefId);
                 } catch (err) {
                     notSent.push({ MDetails: { message: message, time: getFormattedTime() }, receiverId: receiverId });
                     console.error("Error sending private message:", err);
@@ -572,27 +577,28 @@
                     mediaRecorder.onstop = async () => {
                         const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
                         const audioUrl = URL.createObjectURL(audioBlob);
-                        [div] = displayAudioMessage(audioUrl, globalMessageUser.id); // Display sent message
-                        await sendAudioInChunks(audioBlob, div);
+                        //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
+                        const localRefId = RefID;
+                        let [div, messageId] = displayAudioMessage(audioUrl, userId, getFormattedTime(), RefID); // messageId is optional
+                        await sendAudioInChunks(audioBlob, div, messageId, localRefId);
                     };
                 }
             }
 
-            async function sendAudioInChunks(audioBlob, div) {
+            async function sendAudioInChunks(audioBlob, div, messageId, refID) {
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 reader.onloadend = async () => {
                     const base64Audio = reader.result.split(',')[1]; // Remove prefix
                     const chunkSize = 5000; // Adjust chunk size if needed
                     const totalChunks = Math.ceil(base64Audio.length / chunkSize);
-
                     let uploadedChunks = 0; // Track progress
 
                     for (let i = 0; i < totalChunks; i++) {
                         const chunk = base64Audio.slice(i * chunkSize, (i + 1) * chunkSize);
                         const isLastChunk = i === totalChunks - 1;
 
-                        await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk, RefID);
+                        await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk, messageId, refID);
 
                         uploadedChunks++;
                         updateUploadProgress(uploadedChunks, totalChunks, div); // Update UI
@@ -613,7 +619,7 @@
             }
             let audioMessageBuffer = {}; // Store incoming chunks per sender
 
-            connection.on("sendlargemessage", async (senderUserId, messageSize, chunkIndex, chunk, finished, time, senderName) => {
+            connection.on("sendlargemessage", async (senderUserId, messageSize, chunkIndex, chunk, finished, time, messageID, messageRefId, senderName) => {
                 // Ensure buffer exists for this sender
                 if (!audioMessageBuffer[senderUserId]) {
                     audioMessageBuffer[senderUserId] = { chunks: [], receivedSize: 0 };
@@ -632,11 +638,8 @@
                     let base64Audio = audioMessageBuffer[senderUserId].chunks.join(""); // Combine chunks
                     let audioBlob = new Blob([Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))], { type: "audio/webm" });
                     let audioUrl = URL.createObjectURL(audioBlob);
-
-
-
                     if (senderUserId === globalMessageUser.id) {
-                        displayAudioMessage(audioUrl, senderUserId, time, "Reciever");
+                        displayAudioMessage(audioUrl, senderUserId, time, messageRefId, messageID, "Reciever");
                         try { messagesList.removeChild(divRecording); } catch { };
                         notification.play();
                         confirm();
@@ -644,7 +647,7 @@
                     else {
                         notification.src = "./unlock1.mp3";
                         notification.play();
-                        notSeen.push([audioUrl, "audio"]);
+                        notSeen.push([audioUrl, time]);
                         const notificationEl = showNotification(`🎙️Record from ➡️ ${senderName}`);
                         notificationEl.onclick = () => {
                             GetOnlinePeople(senderUserId);
@@ -710,10 +713,14 @@
             document.getElementById("currentUsername").innerText = globalMessageUser.username;
             document.querySelector(".chat-body").innerText = "";
             while (notSeen.length > 0) {
-                appendMessage(notSeen.shift(), "Reciever");
+                const notSeenEl = notSeen.shift();
+                if (notSeenEl instanceof Array)
+                    displayAudioMessage(notSeenEl[0], globalMessageUser.id, notSeenEl[1], "Reciever");
+                else
+                    appendMessage(notSeenEl, "Reciever");
             }
         }
-        function addToDom(id, type = "Sender", ...elements) {
+        function addToDom(id, refId, type = "Sender", ...elements) {
             const messagesList = document.getElementById("messagesList");
             const div = document.createElement("div");
             div.id = id;
@@ -723,11 +730,29 @@
             else {
                 div.className = "message sent";
                 document.getElementById("messageInput").innerText = "";
+                try {
+                    removeRef();
+                } catch { }
+            }
+            if (refId) {
+                const ref = document.createElement("div");
+                ref.style.cssText = "font-size:0.58rem;border-left:3px solid #008f7e;background-color:#f8fffe8e;color:black;cursor:pointer;padding:5px;"
+                const referencedEl = document.getElementById(refId);
+                const ii = referencedEl.childNodes;
+                let text = targetText(referencedEl);
+                if (text !== "")
+                    ref.append(text);
+                ref.onclick = () => {
+                    elementFocus(referencedEl);
+                }
+                ref.className = "REF";
+                div.appendChild(ref);
             }
             scrollToBottom();
             for (let i of elements) {
                 div.append(i);
             }
+
             messagesList.appendChild(div);
         }
         /**
@@ -736,32 +761,21 @@
         */
         function appendMessage(message, type = "Sender") {
             const innerMessage = document.createElement("div");
-            const ref = document.createElement("div");
-            ref.style.fontSize = "0.56rem";
-            ref.style.backgroundColor = "#008f7e";
-            ref.style.cursor = "pointer";
-            if (message.ref) {
-                const referencedEl = document.getElementById(message.ref)
-                ref.innerHTML = referencedEl.childNodes[1].innerText.substring(0, 20);
-                ref.onclick = () => {
-                    elementFocus(referencedEl);
-                }
-                ref.className = "REF";
-            }
             innerMessage.innerText = message.message;
+            innerMessage.className = "textM";
             const time = document.createElement("div");
             time.innerText = `sent at:${message.time}`;
             time.style.cssText = "font-size:0.54rem;";
             if (regex.test(message.message)) {
                 innerMessage.style.direction = "rtl";
             }
-            addToDom(message.messageID, type, ref, innerMessage, time);
+            addToDom(message.messageID, message.ref, type, innerMessage, time);
         }
         /**
-        * @param {{message:string,time:string}} message
-        * @param {"Sender"|"Reciever"} type
-        */
-        function displayAudioMessage(audioUrl, senderId, time, type = "Sender") {
+         * @param {{message:string,time:string}} message
+         * @param {"Sender"|"Reciever"} type
+         */
+        function displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender") {
             const process = document.createElement("div");
             process.style.cssText = "font-size:0.8rem;";
             const audioElement = document.createElement("audio");
@@ -769,17 +783,20 @@
             audioElement.preload = "metadata";
             audioElement.src = audioUrl;
             audioElement.style.scale = "0.9";
-            
-            const id = "Audio" + getFormattedTime() + ++idCounter;
+            let id;
+            if (!messageId)
+                id = ("Audio" + getFormattedTime() + ++idCounter + senderId).replaceAll(/\s/ig, "");
+            else
+                id = messageId;
             const _time = document.createElement("div");
-            if(type === "Reciever"){
+            if (type === "Reciever") {
                 _time.innerText = `sent at:${time}`;
                 _time.style.cssText = "font-size:0.54rem;";
-                addToDom(id, type, audioElement,_time, process);
+                addToDom(id, refId, type, audioElement, _time, process);
                 return [process, audioElement];
             }
-            addToDom(id, type, audioElement, process);
-            return [process, audioElement];
+            addToDom(id, refId, type, audioElement, process);
+            return [process, id, audioElement];
         }
         function elementFocus(el) {
             el.focus();
@@ -787,6 +804,32 @@
             setTimeout(() => {
                 el.removeAttribute("style");
             }, 1500)
+        }
+        function removeRef() {
+            refID_El.innerHTML = "";
+            refID_El.removeAttribute("style");
+            RefID = "";
+        }
+        function targetText(el) {
+            refID_El.style.padding = "10px";
+            let childNodes = el.childNodes;
+            let mainChildNode = el.querySelector(".textM");
+            let text = "";
+            if (el.classList.contains("sent")) {
+                text = "(You) ";
+            } else if (el.classList.contains("received")) {
+                text = `(${globalMessageUser.username}) `;
+            }
+            if (mainChildNode === undefined) {
+                mainChildNode = el.querySelector("audio");
+            }
+            if (mainChildNode.tagName !== "DIV") {
+                text += `Audio: at ${mainChildNode.innerText}`;
+            } else {
+                let str = mainChildNode.innerText;
+                text += str.length > 20 ? str.substring(0, 20) + "...." : str;
+            }
+            return text;
         }
     </script>
 </body>
