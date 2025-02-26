@@ -687,6 +687,10 @@
                 } else {
                     stopRecording();
                     // _StopRecording();
+                    if (mediaRecorder) {
+                        mediaRecorder.getTracks().forEach(track => track.stop()); // Stop all tracks
+                        console.log('Microphone stopped.');
+                    }
                 }
             }
 
