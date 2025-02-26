@@ -679,6 +679,7 @@
             let mediaRecorder;
             let audioChunks = [];
             let isRecording = false;
+            let stream;
 
             async function toggleRecording() {
                 if (!isRecording) {
@@ -687,16 +688,12 @@
                 } else {
                     stopRecording();
                     // _StopRecording();
-                    if (mediaRecorder) {
-                        mediaRecorder.getTracks().forEach(track => track.stop()); // Stop all tracks
-                        console.log('Microphone stopped.');
-                    }
                 }
             }
 
             async function startRecording() {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
                     isRecording = true;
@@ -720,6 +717,10 @@
             async function stopRecording() {
                 if (mediaRecorder && isRecording) {
                     mediaRecorder.stop();
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop()); // Stop all tracks
+                        console.log('Microphone stopped.');
+                    }
                     isRecording = false;
                     _StopRecording();
                     console.log("Recording stopped... Sending audio.");
