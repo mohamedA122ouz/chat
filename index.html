@@ -250,7 +250,7 @@
     <audio src="./water_drop.mp3"></audio>
     <div class="chat-container">
         <div class="chat-header">
-            <strong id="currentUsername">informant No Chat yet</strong>
+            <strong id="currentUsername">Online People</strong>
             <img src="https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png"
                 alt="Profile" id="profilePic">
         </div>
@@ -290,7 +290,7 @@
         divRecording.className = "message received loading";
         let timer = 0;
         let timer2 = 0;
-        const globalMessageUser = { username: "informant No Chat yet", imageLink: "https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png", id: "-1" };
+        const globalMessageUser = { username: "Online People", imageLink: "https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png", id: "-1" };
         try {
             token = sessionStorage.getItem("token");
             if (token)
@@ -372,6 +372,7 @@
                 }
                 messageInput.focus();
             }
+
             function handleTouch(e) {
                 isTouchDevice = true;
                 removeEventListener(handleTouch);
@@ -391,9 +392,7 @@
                     return;
                 }
             });
-
             sendButton.addEventListener("click", sendMessage);
-
             const connection = new signalR.HubConnectionBuilder()
                 .withUrl(url)
                 .configureLogging(signalR.LogLevel.Information)
@@ -405,10 +404,9 @@
                     console.log("SignalR Connected.");
                     document.getElementById("connectionStatus").style.display = "none";
                     connection.invoke("MyID");
-                    connection.on("MyID", (MyID) => {
+                    connection.invoke("SendPendingMasseges");
+                    await connection.on("MyID", (MyID) => {
                         userId = MyID;
-                        // if (allSent())
-                        //     sendNotSent();
                     });
                     GetOnlinePeople();
                 } catch (err) {
@@ -469,7 +467,12 @@
             function confirm() {
                 connection.invoke("Confirmation", globalMessageUser.id);
             }
-            connection.on("ReceivePrivateMessage", (senderId, message, senderName) => {
+            /**
+             * @param {string} senderId
+             * @param {{message,time,ref,messageID}} message
+             * @param {{id: string; imageLink: string; username: string;} | string} senderName
+            */
+            function RecieveMessage(senderId, message, senderName) {
                 if (senderId === globalMessageUser.id) {
                     appendMessage(message, "Reciever");
                     try { messagesList.removeChild(divLoad); } catch { };
@@ -481,16 +484,20 @@
                     notification.src = "./unlock1.mp3";
                     notification.play();
                     pushNotSeen(senderId, message);
-                    const notificationEl = showNotification(`🔔Message:${message.message}\n➡️${senderName}`);
+                    const notificationEl = showNotification(`🔔Message:${message.message}\n➡️${senderName instanceof Object ? senderName.username : senderName}`);
                     notificationEl.onclick = () => {
-                        GetOnlinePeople(senderId);
+                        if (senderName instanceof Object)
+                            changeUser(senderName)//senderDetails
+                        else
+                            GetOnlinePeople(senderId);
                         notificationEl.style.display = "none";
                     }
                     notification.onended = (el => {
                         notification.src = "./water_drop.mp3";
                     });
                 }
-            });
+            }
+            connection.on("ReceivePrivateMessage", RecieveMessage);
             function pushNotSeen(senderId, message) {
                 if (!(notSeen[senderId] instanceof Array))
                     notSeen[senderId] = [];
@@ -498,58 +505,55 @@
             }
             let currentUser = globalMessageUser; // Tracks the currently active chat user
 
-            function createUserListContainer() {
-                const container = document.createElement("div");
-                container.id = "user-list";
-                container.style.cssText = `
-    position: fixed;
-    right: 50%;
-    transform: translate(40%, 0px);
-    top: 5%;
-    width: 250px;
-    border: 1px solid rgb(204, 204, 204);
-    background: rgb(255, 255, 255);
-    padding: 10px;
-    overflow-y: auto;
-    max-height: 400px;
-    border-radius: 5px;
-    box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 5px;
-    scale: 1.3;
-    display: block;
-    `;
-                document.body.appendChild(container);
-            }
+            // function createUserListContainer() {
+            //     const container = document.createElement("div");
+            //     container.id = "user-list";
+            //     container.style.cssText = `
+            //     position: fixed;
+            //     right: 50%;
+            //     transform: translate(40%, 0px);
+            //     top: 5%;
+            //     width: 250px;
+            //     border: 1px solid rgb(204, 204, 204);
+            //     background: rgb(255, 255, 255);
+            //     padding: 10px;
+            //     overflow-y: auto;
+            //     max-height: 400px;
+            //     border-radius: 5px;
+            //     box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 5px;
+            //     scale: 1.3;
+            //     display: block;
+            //     `;
+            //     document.body.appendChild(container);
+            // }
 
             // Function to render the online users list
             function renderUserList(online, chosen) {
-                let container = document.getElementById("user-list");
-                if (!container) {
-                    createUserListContainer();
-                    container = document.getElementById("user-list");
-                }
-
-                container.innerHTML = ""; // Clear previous list
+                const userReset = { username: "Online People", imageLink: "https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png", id: "-1" };
+                changeUser(userReset);
+                let container = document.querySelector(".chat-body");
+                let chatFooter = document.querySelector(".chat-footer");
+                chatFooter.style.visibility = "hidden";
 
                 online.forEach(user => {
                     const userItem = document.createElement("div");
                     userItem.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 5px;
-            cursor: pointer;
-            border-bottom: 1px solid #ddd;
-            background: ${user.id === chosen ? "#e0f7fa" : "transparent"};
-        `;
-
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 5px;
+                    cursor: pointer;
+                    border-bottom: 1px solid #ddd;
+                    background: ${user.id === chosen ? "#e0f7fa" : "transparent"};
+                    `;
                     // Create user image
                     const userImg = document.createElement("img");
                     userImg.src = user.imageLink;
                     userImg.style.cssText = `
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            margin-right: 10px;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    margin-right: 10px;
         `;
 
                     // Create username text
@@ -562,7 +566,7 @@
 
                     // Indicate if currently in a chat with this user
                     const statusIndicator = document.createElement("span");
-                    if (user.id === currentUser.id) {
+                    if (user.id === chosen) {
                         statusIndicator.textContent = "✓"; // Active chat indicator
                         statusIndicator.style.color = "green";
                     }
@@ -581,7 +585,7 @@
                 });
             }
             connection.on("GetOnlinePeople", (online, chosen) => {
-                if (chosen === "-1") {
+                if (chosen === "-1" && chosen === "-2") {
                     currentUser = globalMessageUser;
                 }
                 else {
@@ -589,6 +593,9 @@
                     if (selectedUser) {
                         currentUser = selectedUser;
                     }
+                }
+                if (chosen === "-2" && globalMessageUser.id !== "-1") {
+                    return;
                 }
                 renderUserList(online, currentUser.id);
                 document.getElementById("user-list").style.display = "block";
@@ -667,6 +674,22 @@
                         notification.src = "./water_drop.mp3";
                     });
                 }
+            });
+            connection.on("CheckPendingMasseges", (messagesLists) => {
+                console.log(messagesLists);
+                messagesLists.forEach(el => {
+                    let MessageDetails = {
+                        message: el.message,
+                        time: el.messageTime,
+                        ref: el.refId,
+                        messageID: el.messageId
+                    }
+                    RecieveMessage(el.senderId, MessageDetails, {
+                        id: el.senderId,
+                        imageLink: el.senderImage,
+                        username: el.senderName
+                    });
+                })
             });
             // ________________________________________________________________
             document.addEventListener("keydown", async (event) => {
@@ -785,7 +808,6 @@
                 // Process when all chunks are received
                 if (finished && audioMessageBuffer[senderUserId].receivedSize >= messageSize) {
                     // console.log(`All chunks received from ${senderUserId}. Reconstructing audio...`);
-
                     let base64Audio = audioMessageBuffer[senderUserId].chunks.join(""); // Combine chunks
                     let audioBlob = new Blob([Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))], { type: "audio/webm" });
                     let audioUrl = URL.createObjectURL(audioBlob);
@@ -866,20 +888,25 @@
         * @param {()=>{}} callback
         */
         function changeUser(chosen, callback) {
+
             globalMessageUser.id = chosen.id;
             globalMessageUser.imageLink = chosen.imageLink;
             globalMessageUser.username = chosen.username;
             document.getElementById("profilePic").src = globalMessageUser.imageLink;
             document.getElementById("currentUsername").innerText = globalMessageUser.username;
+            const footer = document.querySelector(".chat-footer");
+            if (footer.style.visibility === "hidden" && chosen.id != -1) {
+                footer.style.visibility = "visible";
+            }
             document.querySelector(".chat-body").innerText = "";
-            document.getElementById("user-list").style.display = "none";
+            try {
+                document.getElementById("user-list").style.display = "none";
+            } catch { }
             if (notSeen[globalMessageUser.id]) {
                 let items = notSeen[globalMessageUser.id];
                 while (items.length > 0) {
                     const notSeenEl = items.shift();
                     if (notSeenEl instanceof Array) {
-                        //displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender")
-                        // notseen audio arr => [audioUrl,messageRefId,messageID, time] 
                         displayAudioMessage(notSeenEl[0], globalMessageUser.id, notSeenEl[3], notSeenEl[1], notSeenEl[2], "Reciever");
                     }
                     else
@@ -919,7 +946,6 @@
             for (let i of elements) {
                 div.append(i);
             }
-
             messagesList.appendChild(div);
         }
         /**
@@ -945,13 +971,6 @@
         function displayAudioMessage(audioUrl, senderId, time, refId, messageId, type = "Sender") {
             const process = document.createElement("div");
             process.style.cssText = "font-size:0.8rem;";
-            // const audioElement = document.createElement("audio");
-            // audioElement.controls = true;
-            // audioElement.preload = "metadata";
-
-            // // audioElement.load();
-            // audioElement.src = audioUrl;
-            // audioElement.style.scale = "0.9";
             const audioElement = (new CustomAudioElement(senderId, audioUrl));
             let id;
             if (!messageId)
