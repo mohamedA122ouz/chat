@@ -822,7 +822,7 @@
                         notification.src = "./unlock1.mp3";
                         notification.play();
                         pushNotSeen(senderUserId, [audioUrl, messageRefId, messageID, time]);
-                        const notificationEl = showNotification(`🎙️Record from ➡️ ${senderName}`);
+                        const notificationEl = showNotification(`🎙️Record from ➡️${senderName instanceof Object ? senderName.username : senderName}`);
                         notificationEl.onclick = () => {
                             if (senderName instanceof Object)
                                 changeUser(senderName)//senderDetails
