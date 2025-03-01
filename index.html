@@ -824,7 +824,10 @@
                         pushNotSeen(senderUserId, [audioUrl, messageRefId, messageID, time]);
                         const notificationEl = showNotification(`🎙️Record from ➡️ ${senderName}`);
                         notificationEl.onclick = () => {
-                            GetOnlinePeople(senderUserId);
+                            if (senderName instanceof Object)
+                                changeUser(senderName)//senderDetails
+                            else
+                                GetOnlinePeople(senderId);
                             notificationEl.style.display = "none";
                         }
                         notification.onended = (el => {
@@ -874,9 +877,17 @@
             notification.innerText = message;
             notification.style.display = "block";
             notification.dataset = metaData;
-            setTimeout(() => {
+            let setterTime = setTimeout(() => {
                 notification.style.display = "none";
             }, 5000);
+            notification.onmouseenter = (e) => {
+                clearTimeout(setterTime);
+            };
+            notification.onmouseleave = (e) => {
+                setterTime = setTimeout(() => {
+                    notification.style.display = "none";
+                }, 5000);
+            };
             return notification;
         }
         function scrollToBottom() {
