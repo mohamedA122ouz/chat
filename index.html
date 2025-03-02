@@ -343,12 +343,9 @@
                 /**
                  * @param {HTMLElement} el
                  */
-
-
                 const ref = document.createElement("div");
                 ref.style.cssText = "margin-left:auto;margin-right:10px;";
                 ref.innerHTML = 'X';
-
                 if (e.target.classList.contains("message")) {
                     refID_El.style.padding = "10px";
                     RefID = e.target.id;
@@ -372,7 +369,6 @@
                 }
                 messageInput.focus();
             }
-
             function handleTouch(e) {
                 isTouchDevice = true;
                 removeEventListener(handleTouch);
@@ -397,7 +393,6 @@
                 .withUrl(url)
                 .configureLogging(signalR.LogLevel.Information)
                 .build();
-
             async function start() {
                 try {
                     await connection.start();
@@ -415,12 +410,10 @@
                     setTimeout(() => start(), 5000);
                 }
             }
-
             connection.onclose(async () => {
                 document.getElementById("connectionStatus").style.display = "block";
                 await start();
             });
-
             connection.on("ReceiveError", function (errorMessage) {
                 alert("Error: " + errorMessage);
             });
@@ -504,29 +497,6 @@
                 notSeen[senderId].push(message);
             }
             let currentUser = globalMessageUser; // Tracks the currently active chat user
-
-            // function createUserListContainer() {
-            //     const container = document.createElement("div");
-            //     container.id = "user-list";
-            //     container.style.cssText = `
-            //     position: fixed;
-            //     right: 50%;
-            //     transform: translate(40%, 0px);
-            //     top: 5%;
-            //     width: 250px;
-            //     border: 1px solid rgb(204, 204, 204);
-            //     background: rgb(255, 255, 255);
-            //     padding: 10px;
-            //     overflow-y: auto;
-            //     max-height: 400px;
-            //     border-radius: 5px;
-            //     box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 5px;
-            //     scale: 1.3;
-            //     display: block;
-            //     `;
-            //     document.body.appendChild(container);
-            // }
-
             // Function to render the online users list
             function renderUserList(online, chosen) {
                 const userReset = { username: "Online People", imageLink: "https://raw.githubusercontent.com/mohamedA122ouz/UserMedia/refs/heads/main/informant.png", id: "-1" };
@@ -534,7 +504,6 @@
                 let container = document.querySelector(".chat-body");
                 let chatFooter = document.querySelector(".chat-footer");
                 chatFooter.style.visibility = "hidden";
-
                 online.forEach(user => {
                     const userItem = document.createElement("div");
                     userItem.style.cssText = `
@@ -544,8 +513,7 @@
                     padding: 5px;
                     cursor: pointer;
                     border-bottom: 1px solid #ddd;
-                    background: ${user.id === chosen ? "#e0f7fa" : "transparent"};
-                    `;
+                    background: ${user.id === chosen ? "#e0f7fa" : "transparent"};`;
                     // Create user image
                     const userImg = document.createElement("img");
                     userImg.src = user.imageLink;
@@ -553,9 +521,7 @@
                     width: 40px;
                     height: 40px;
                     border-radius: 50%;
-                    margin-right: 10px;
-        `;
-
+                    margin-right: 10px;`;
                     // Create username text
                     const username = document.createElement("span");
                     if (userId === user.id)
@@ -563,18 +529,15 @@
                     else
                         username.textContent = user.username;
                     username.style.flex = "1";
-
                     // Indicate if currently in a chat with this user
                     const statusIndicator = document.createElement("span");
                     if (user.id === chosen) {
                         statusIndicator.textContent = "✓"; // Active chat indicator
                         statusIndicator.style.color = "green";
                     }
-
                     userItem.appendChild(userImg);
                     userItem.appendChild(username);
                     userItem.appendChild(statusIndicator);
-
                     // Handle user selection
                     userItem.addEventListener("click", () => {
                         if (user.id !== "-1") {
@@ -600,7 +563,6 @@
                 renderUserList(online, currentUser.id);
                 document.getElementById("user-list").style.display = "block";
             });
-
             connection.on("IsTyping", (senderId) => {
                 if (senderId === globalMessageUser.id) {
                     messagesList.appendChild(divLoad);
@@ -698,22 +660,17 @@
                     toggleRecording();
                 }
             });
-
             let mediaRecorder;
             let audioChunks = [];
             let isRecording = false;
             let stream;
-
             async function toggleRecording() {
                 if (!isRecording) {
                     startRecording();
-                    // Recording();
                 } else {
                     stopRecording();
-                    // _StopRecording();
                 }
             }
-
             async function startRecording() {
                 try {
                     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -736,7 +693,6 @@
                     console.error("Error accessing microphone:", error);
                 }
             }
-
             async function stopRecording() {
                 if (mediaRecorder && isRecording) {
                     mediaRecorder.stop();
@@ -747,7 +703,6 @@
                     isRecording = false;
                     _StopRecording();
                     console.log("Recording stopped... Sending audio.");
-
                     mediaRecorder.onstop = async () => {
                         const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
                         const audioUrl = URL.createObjectURL(audioBlob);
@@ -758,7 +713,6 @@
                     };
                 }
             }
-
             async function sendAudioInChunks(audioBlob, div, messageId, refID) {
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
@@ -767,19 +721,15 @@
                     const chunkSize = 5000; // Adjust chunk size if needed
                     const totalChunks = Math.ceil(base64Audio.length / chunkSize);
                     let uploadedChunks = 0; // Track progress
-
                     for (let i = 0; i < totalChunks; i++) {
                         const chunk = base64Audio.slice(i * chunkSize, (i + 1) * chunkSize);
                         const isLastChunk = i === totalChunks - 1;
-
                         await connection.invoke("SendLargeMessage", globalMessageUser.id, base64Audio.length, i, chunk, isLastChunk, messageId, refID);
-
                         uploadedChunks++;
                         updateUploadProgress(uploadedChunks, totalChunks, div); // Update UI
                     }
                 };
             }
-
             // Function to update progress in UI
             function updateUploadProgress(uploadedChunks, totalChunks, div) {
                 const percentage = Math.round((uploadedChunks / totalChunks) * 100);
@@ -792,19 +742,15 @@
                 }
             }
             let audioMessageBuffer = {}; // Store incoming chunks per sender
-
             connection.on("sendlargemessage", async (senderUserId, messageSize, chunkIndex, chunk, finished, time, messageID, messageRefId, senderName) => {
                 // Ensure buffer exists for this sender
                 if (!audioMessageBuffer[senderUserId]) {
                     audioMessageBuffer[senderUserId] = { chunks: [], receivedSize: 0 };
                 }
-
                 // Store chunk at correct index
                 audioMessageBuffer[senderUserId].chunks[chunkIndex] = chunk;
                 audioMessageBuffer[senderUserId].receivedSize += chunk.length;
-
                 // console.log(`Received chunk ${chunkIndex} from ${senderUserId}, Size: ${chunk.length}`);
-
                 // Process when all chunks are received
                 if (finished && audioMessageBuffer[senderUserId].receivedSize >= messageSize) {
                     // console.log(`All chunks received from ${senderUserId}. Reconstructing audio...`);
@@ -899,7 +845,6 @@
         * @param {()=>{}} callback
         */
         function changeUser(chosen, callback) {
-
             globalMessageUser.id = chosen.id;
             globalMessageUser.imageLink = chosen.imageLink;
             globalMessageUser.username = chosen.username;
@@ -1013,7 +958,6 @@
             RefID = "";
         }
         function targetText(el) {
-
             let childNodes = el.childNodes;
             let mainChildNode = el.querySelector(".textM");
             let text = "";
@@ -1023,9 +967,9 @@
                 text = `(${globalMessageUser.username}) `;
             }
             if (!mainChildNode) {
-                mainChildNode = el.querySelector("audio");
+                mainChildNode = el.querySelector(".audio-container");
             }
-            if (mainChildNode.tagName !== "DIV") {
+            if (mainChildNode.classList.contains("audio-container")) {
                 text += `Audio: at ${el.lastChild.innerText}`;
             } else {
                 let str = mainChildNode.innerText;
