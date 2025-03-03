@@ -174,8 +174,64 @@
             font-weight: bold;
             display: inline-block;
             font-family: monospace;
-            clip-path: inset(0 3ch 0 0);
-            animation: l 1s steps(4, jump-none) infinite;
+            display: flex;
+            /* margin-left: 25px; */
+            justify-content: center;
+            align-items: center;
+        }
+        .snippet{
+            margin:0 20px
+        }
+        .dot-flashing::before,
+        .dot-flashing::after {
+            content: "";
+            display: inline-block;
+            position: absolute;
+            top: 0;
+        }
+
+        .dot-flashing::before {
+            left: -15px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background-color: rgba(133, 133, 133, 0.2);
+            color: rgba(133, 133, 133, 0.2);
+            animation: dot-flashing 1s infinite alternate;
+            animation-delay: 0ms;
+        }
+
+        .dot-flashing {
+            position: relative;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background-color: rgba(133, 133, 133, 0.2);
+            color: rgba(133, 133, 133, 0.2);
+            animation: dot-flashing 1s infinite linear alternate;
+            animation-delay: 300ms;
+        }
+
+        .dot-flashing::after {
+            left: 15px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background-color: rgba(133, 133, 133, 0.2);
+            color: rgba(133, 133, 133, 0.2);
+            animation: dot-flashing 1s infinite alternate;
+            animation-delay: 600ms;
+        }
+
+        @keyframes dot-flashing {
+            0% {
+                background-color: #000000;
+            }
+
+            50%,
+            100% {
+                background-color: rgba(133, 133, 133, 0.2);
+            }
         }
 
         #RefID {
@@ -203,11 +259,6 @@
             outline: none;
         }
 
-        @keyframes l {
-            to {
-                clip-path: inset(0)
-            }
-        }
 
         .audio-container {
             display: flex;
@@ -284,9 +335,17 @@
         let interval = -0x12;
         let RefID = "";
         const refID_El = document.getElementById("RefID");
-        divLoad.innerText = "✍🏻IsTyping...";
+        divLoad.innerHTML = `✍🏻<div class="snippet" data-title="dot-flashing">
+                                    <div class="stage">
+                                        <div class="dot-flashing"></div>
+                                    </div>
+                                </div>`;
         divLoad.className = "message received loading";
-        divRecording.innerText = "🎙️IsRecording...";
+        divRecording.innerHTML = `🎙️<div class="snippet" data-title="dot-flashing">
+                                        <div class="stage">
+                                            <div class="dot-flashing"></div>
+                                        </div>
+                                    </div>`;
         divRecording.className = "message received loading";
         let timer = 0;
         let timer2 = 0;
