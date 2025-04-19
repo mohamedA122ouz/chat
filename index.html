@@ -179,9 +179,11 @@
             justify-content: center;
             align-items: center;
         }
-        .snippet{
-            margin:0 20px
+
+        .snippet {
+            margin: 0 20px
         }
+
         .dot-flashing::before,
         .dot-flashing::after {
             content: "";
@@ -947,7 +949,6 @@
                 const ref = document.createElement("div");
                 ref.style.cssText = "font-size:0.58rem;border-left:3px solid #008f7e;background-color:#f8fffe8e;color:black;cursor:pointer;padding:5px;"
                 const referencedEl = document.getElementById(refId);
-                const ii = referencedEl.childNodes;
                 let text = targetText(referencedEl);
                 if (text !== "")
                     ref.append(text);
@@ -1017,24 +1018,28 @@
             RefID = "";
         }
         function targetText(el) {
-            let childNodes = el.childNodes;
-            let mainChildNode = el.querySelector(".textM");
-            let text = "";
-            if (el.classList.contains("sent")) {
-                text = "(You) ";
-            } else if (el.classList.contains("received")) {
-                text = `(${globalMessageUser.username}) `;
+            try {
+                let childNodes = el.childNodes;
+                let mainChildNode = el.querySelector(".textM");
+                let text = "";
+                if (el.classList.contains("sent")) {
+                    text = "(You) ";
+                } else if (el.classList.contains("received")) {
+                    text = `(${globalMessageUser.username}) `;
+                }
+                if (!mainChildNode) {
+                    mainChildNode = el.querySelector(".audio-container");
+                }
+                if (mainChildNode.classList.contains("audio-container")) {
+                    text += `Audio: at ${el.lastChild.innerText}`;
+                } else {
+                    let str = mainChildNode.innerText;
+                    text += str.length > 20 ? str.substring(0, 20) + "...." : str;
+                }
+                return text;
+            } catch {
+                return "❌⚙️🤖Reference Message Have an Error"
             }
-            if (!mainChildNode) {
-                mainChildNode = el.querySelector(".audio-container");
-            }
-            if (mainChildNode.classList.contains("audio-container")) {
-                text += `Audio: at ${el.lastChild.innerText}`;
-            } else {
-                let str = mainChildNode.innerText;
-                text += str.length > 20 ? str.substring(0, 20) + "...." : str;
-            }
-            return text;
         }
     </script>
 </body>
